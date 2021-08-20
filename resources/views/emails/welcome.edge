@@ -1,0 +1,9 @@
+@layout('emails/layouts/master')
+@section('main')
+    <h2>Please verify your email address.</h2>
+    <p>Hi {{ user.name }},</p>
+    <p>We got a request to verify your email for TeeMates.</p>
+    <p>Your verification code : <strong>{{ otp }}</strong></p>
+    <p>If you didn't request, please ignore this email.</p>
+    <p>Thanks,<br>{{ process.env.APP_NAME }}</p>
+@endsection
