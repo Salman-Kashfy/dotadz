@@ -23,10 +23,17 @@ export default Env.rules({
 	SESSION_DRIVER: Env.schema.string(),
 	NODE_ENV: Env.schema.enum(['development', 'production', 'testing'] as const),
 	DB_CONNECTION: Env.schema.string(),
+
 	MYSQL_HOST: Env.schema.string({ format: 'host' }),
 	MYSQL_PORT: Env.schema.number(),
 	MYSQL_USER: Env.schema.string(),
 	MYSQL_PASSWORD: Env.schema.string.optional(),
 	MYSQL_DB_NAME: Env.schema.string(),
     MAIL_FROM_ADDRESS: Env.schema.string(),
+
+	REDIS_CONNECTION: Env.schema.enum(['local'] as const),
+	REDIS_HOST: Env.schema.string({ format: 'host' }),
+	REDIS_PORT: Env.schema.number(),
+	REDIS_PASSWORD: Env.schema.string.optional(),
+
 })

@@ -37,7 +37,8 @@ export default class RegisterValidator {
             rules.mobile()
         ]),
         password: schema.string({}, [
-            rules.maxLength(180)
+            rules.maxLength(180),
+            rules.minLength(6)
         ]),
         account_type: schema.enum(
             ['creator', 'user'] as const,[

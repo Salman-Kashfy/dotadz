@@ -3,6 +3,7 @@ import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import AppBaseController from "App/Controllers/Http/AppBaseController";
 import RegisterValidator from "App/Validators/RegisterValidator";
 import User from "App/Models/User";
+import Helper from "App/Helpers/Helper";
 import UserHelper from "App/Helpers/UserHelper";
 import RoleHelper from "App/Helpers/RoleHelper";
 import UserRole from "App/Models/UserRole";
@@ -10,8 +11,9 @@ import VerifyEmail from "App/Mailers/VerifyEmail";
 import Otp from "App/Models/Otp";
 import ResendSignupOtpValidator from "App/Validators/ResendSignupOtpValidator";
 import VerifyEmailValidator from "App/Validators/VerifyEmailValidator";
-import { constants } from "Config/constants";
 import LoginValidator from "App/Validators/LoginValidator";
+import ResetPassword from "App/Mailers/ResetPassword";
+import ResetPasswordValidator from "App/Validators/ResetPasswordValidator";
 
 export default class AuthController extends AppBaseController{
 
@@ -61,7 +63,8 @@ export default class AuthController extends AppBaseController{
         await UserHelper.setUserDevice(user.id, input.device_type, input.device_token);
 
         /* Send Email */
-        new VerifyEmail(user, code).send()
+        const subject = 'Please verify your email address.'
+        await new VerifyEmail(user, code, subject).sendLater()
         return this.sendResponse({user: user},"An OTP has been sent to your email address")
     }
 
@@ -80,7 +83,8 @@ export default class AuthController extends AppBaseController{
             const code = UserHelper.generateOTP(user.id,user.email);
 
             /* Send Email */
-            new VerifyEmail(user, code).send()
+            const subject = 'Please verify your email address.'
+            await new VerifyEmail(user, code, subject).sendLater()
             return this.sendResponse({user: user},"An OTP has been sent to your email address")
         }else{
             return this.sendError('User not found.')
@@ -95,9 +99,7 @@ export default class AuthController extends AppBaseController{
         }
 
         const input = request.all();
-        var currentDate = new Date();
-        var otpMinTime = new Date(currentDate.getTime() - constants.otpExpMins*60000);
-
+        let otpMinTime = Helper.getOtpMinTime();
         let otp = await Otp.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
         if(otp){
             let user = await User.find(otp.user_id)
@@ -126,16 +128,77 @@ export default class AuthController extends AppBaseController{
 
         let user = await User.findBy('email', input.email)
         if(user){
+            let token
+            try {
+                token = await auth.attempt(input.email, input.password)
+            } catch {
+                return this.sendError('Invalid credentials.')
+            }
+
             if (user.is_verified) {
-                const token = await auth.use('api').attempt(input.email, input.password)
-                return token
+                return this.sendResponse({user:user,token:token},'Logged in successfully !')
             }else{
+                await auth.use('api').revoke()
                 return this.sendError('Email not verified. Please verify your email.')
             }
         }
 
         return input;
+    }
 
+    public async send_reset_password_otp( { response,request }: HttpContextContract ) {
+        try {
+            await request.validate(ResendSignupOtpValidator)
+        } catch (error) {
+            return this.sendValidationError(error,response)
+        }
+
+        const input = request.all();
+
+        await Otp.query().where('email', input.email).delete();
+        let user = await User.findBy('email', input.email);
+        if(user){
+            const code = UserHelper.generateOTP(user.id,user.email);
+
+            /* Send Email */
+            const subject = 'Reset Password OTP'
+            await new ResetPassword(user, code, subject).sendLater()
+            return this.sendResponse({user: user},"An OTP has been sent to your email address")
+        }else{
+            return this.sendError('User not found.')
+        }
+    }
+
+    public async reset_password( { response,request }: HttpContextContract ){
+
+        let input
+        try {
+            input = await request.validate(ResetPasswordValidator)
+        } catch (error) {
+            return this.sendValidationError(error,response)
+        }
+
+        let otpMinTime = Helper.getOtpMinTime();
+        let otp = await Otp.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        if(otp){
+            let user = await User.find(otp.user_id)
+            if(user){
+                user.password = input.password
+                if( !await user.save() ){
+                    return this.sendError('Failed to update password. Please try again.')
+                }
+                otp.delete()
+                return this.sendResponse({user:user},'Password updated successfully !')
+            }
+            return this.sendError('User not found.')
+        }else{
+            return this.sendError('OTP not found or is expired.')
+        }
+
+    }
+
+    public async test( { auth }: HttpContextContract ){
+        return auth
     }
 
 }
