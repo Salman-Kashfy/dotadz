@@ -2,15 +2,23 @@ import { DateTime } from 'luxon'
 import { BaseModel, column } from '@ioc:Adonis/Lucid/Orm'
 
 export default class Role extends BaseModel {
-  @column({ isPrimary: true })
-  public id: number
 
-  @column()
-  public name: string
+    static ADMIN = 1;
+    static VENDOR = 2;
+    static USER = 3;
 
-  @column.dateTime({ autoCreate: true })
-  public createdAt: DateTime
+    @column({ isPrimary: true })
+    public id: number
 
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  public updatedAt: DateTime
+    @column()
+    public name: string
+
+    @column()
+    public display_name: string
+
+    @column.dateTime({ autoCreate: true })
+    public createdAt: DateTime
+
+    @column.dateTime({ autoCreate: true, autoUpdate: true })
+    public updatedAt: DateTime
 }

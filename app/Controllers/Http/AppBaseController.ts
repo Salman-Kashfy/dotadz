@@ -1,7 +1,6 @@
 //import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 
 export default class AppBaseController {
-
     public sendError(message){
         return {
             status: false,
@@ -24,5 +23,20 @@ export default class AppBaseController {
             errors : error.messages.errors
         }
         response.badRequest(messages)
+    }
+
+    globalResponse(status, message, data:any = null) {
+        let response:any = {
+            status: status,
+            message: message || "",
+            data: data ? typeof data.toJSON != 'undefined' ? data.toJSON() : data : null
+        }
+        // if(data && data.hasOwnProperty("pages")){
+        //   response.data = data.rows && data.rows.length > 0 ? (data.toJSON()).data : []
+        //   response.pages = data.pages
+        // }else{
+        //     response.data = data.toJSON()
+        // }
+        return response
     }
 }

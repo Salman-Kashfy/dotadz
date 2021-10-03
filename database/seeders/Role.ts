@@ -8,14 +8,17 @@ export default class RoleSeeder extends BaseSeeder {
             {
                 id: 1,
                 name: 'admin',
+                display_name: 'Admin'
             },
             {
                 id: 2,
-                name: 'creator',
+                name: 'vendor',
+                display_name: 'Vendor'
             },
             {
                 id: 3,
                 name: 'user',
+                display_name: 'user'
             }
         ])
     }

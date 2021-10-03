@@ -1,5 +1,5 @@
 {
-  "name": "ignite",
+  "name": "Dotadz",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -18,6 +18,7 @@
   "dependencies": {
     "@adonisjs/auth": "^8.0.7",
     "@adonisjs/core": "^5.1.11",
+    "@adonisjs/fold": "^8.1.5",
     "@adonisjs/lucid": "^15.0.3",
     "@adonisjs/mail": "^7.2.3",
     "@adonisjs/redis": "^7.0.8",
@@ -31,6 +32,7 @@
     "phc-argon2": "^1.1.2",
     "proxy-addr": "^2.0.7",
     "reflect-metadata": "^0.1.13",
-    "source-map-support": "^0.5.19"
+    "source-map-support": "^0.5.19",
+    "stripe": "^8.178.0"
   }
 }

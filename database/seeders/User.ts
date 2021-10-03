@@ -10,6 +10,7 @@ export default class UserSeeder extends BaseSeeder {
                 name: 'admin',
                 email: 'admin@admin.com',
                 password: 'qwerty',
+                is_verified: true,
             }
         ])
     }

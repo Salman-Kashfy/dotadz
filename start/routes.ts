@@ -24,3 +24,6 @@ import './api';
 Route.get('/', async ({ view }) => {
   return view.render('welcome')
 })
+
+Route.get('return-connect-account', 'Api/UserController.connectAccountSuccess')
+Route.get('return-connect-account-failure', 'Api/UserController.connectAccountFailure')

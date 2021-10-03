@@ -1,5 +1,6 @@
 import {rules, schema} from '@ioc:Adonis/Core/Validator'
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
+import Role from "App/Models/Role";
 
 export default class RegisterValidator {
     constructor (protected ctx: HttpContextContract) {
@@ -40,17 +41,13 @@ export default class RegisterValidator {
             rules.maxLength(180),
             rules.minLength(6)
         ]),
-        account_type: schema.enum(
-            ['creator', 'user'] as const,[
-                rules.exists({ table: 'roles', column: 'name' })
-            ]
-        ),
-        device_type: schema.enum(
+        account_type: schema.number([
+            rules.range(Role.VENDOR, Role.USER),
+        ]),
+        device_type: schema.enum.optional(
             ['android', 'ios'] as const
         ),
-        device_token: schema.string({ trim: true }, [
-
-        ])
+        device_token: schema.string.optional({ trim: true }, [])
     })
 
     /**

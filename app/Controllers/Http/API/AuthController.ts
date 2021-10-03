@@ -5,21 +5,26 @@ import RegisterValidator from "App/Validators/RegisterValidator";
 import User from "App/Models/User";
 import Helper from "App/Helpers/Helper";
 import UserHelper from "App/Helpers/UserHelper";
-import RoleHelper from "App/Helpers/RoleHelper";
-import UserRole from "App/Models/UserRole";
 import VerifyEmail from "App/Mailers/VerifyEmail";
-import Otp from "App/Models/Otp";
+import OtpRepo from "App/Repositories/OtpRepository";
 import ResendSignupOtpValidator from "App/Validators/ResendSignupOtpValidator";
 import VerifyEmailValidator from "App/Validators/VerifyEmailValidator";
 import LoginValidator from "App/Validators/LoginValidator";
 import ResetPassword from "App/Mailers/ResetPassword";
 import ResetPasswordValidator from "App/Validators/ResetPasswordValidator";
+import UserRepo from "App/Repositories/UserRepository";
+import RoleHelper from "App/Helpers/RoleHelper";
+import Role from "App/Models/Role";
+import StripeRepo from "App/Repositories/StripeRepository";
+import ForgotPasswordValidator from "App/Validators/ForgotPasswordValidator";
+import VerifyOtpValidator from "App/Validators/VerifyOtpValidator";
+import SocialLoginValidator from "App/Validators/SocialLoginValidator";
 
 export default class AuthController extends AppBaseController{
 
     public async signup( { response, request }: HttpContextContract ){
 
-        let input
+        let input:any
         try {
             input = await request.validate(RegisterValidator)
         } catch (error) {
@@ -50,16 +55,12 @@ export default class AuthController extends AppBaseController{
         const code = UserHelper.generateOTP(user.id, user.email)
 
         /* Assign User Role */
-        const role = await RoleHelper.get_role_by_name(input.account_type)
-
-        const userRole = new UserRole();
-        userRole.user_id = user.id
-        userRole.role_id = role ? role.id : 0
-        if(!await userRole.save()){
-            return this.sendError('Failed to assign user role.')
-        }
+        await user.related('userRoles').create({
+            roleId: input.account_type
+        })
 
         /* Create User Device */
+        if(input.device_type && input.device_token)
         await UserHelper.setUserDevice(user.id, input.device_type, input.device_token);
 
         /* Send Email */
@@ -77,13 +78,13 @@ export default class AuthController extends AppBaseController{
 
         const input = request.all();
 
-        await Otp.query().where('email', input.email).delete();
-        let user = await User.findBy('email', input.email);
+        await OtpRepo.model.query().where('email', input.email).delete();
+        let user = await UserRepo.model.findBy('email', input.email);
         if(user){
-            const code = UserHelper.generateOTP(user.id,user.email);
+            const code:number = UserHelper.generateOTP(user.id,user.email);
 
             /* Send Email */
-            const subject = 'Please verify your email address.'
+            const subject:string = 'Please verify your email address.'
             await new VerifyEmail(user, code, subject).sendLater()
             return this.sendResponse({user: user},"An OTP has been sent to your email address")
         }else{
@@ -99,27 +100,33 @@ export default class AuthController extends AppBaseController{
         }
 
         const input = request.all();
-        let otpMinTime = Helper.getOtpMinTime();
-        let otp = await Otp.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
-        if(otp){
-            let user = await User.find(otp.user_id)
-            if(user){
-                user.is_verified = true
-                if( !await user.save() ){
-                    return this.sendError('Failed to verify user. Please try again.')
-                }
-                otp.delete()
-                return this.sendResponse({user:user},'OTP verified successfully !')
-            }
-            return this.sendError('User not found.')
-        }else{
+        let otpMinTime:any = Helper.getOtpMinTime();
+        let otp:any = await OtpRepo.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        if(!otp){
             return this.sendError('OTP not found or is expired.')
         }
+
+        let user = await UserRepo.model.find(otp.user_id)
+        if(!user){
+            return this.sendError('User not found.')
+        }
+
+        if (await RoleHelper.has_role(user,Role.USER)) {
+            let customer = await StripeRepo.addCustomer(user.email)
+            user.stripe_customer_id = customer.id
+            await user.save()
+        }
+        user.is_verified = true
+        if( !await user.save() ){
+            return this.sendError('Failed to verify user. Please try again.')
+        }
+        otp.delete()
+        return this.sendResponse({user:user},'OTP verified successfully !')
     }
 
     public async login( { response, auth, request }: HttpContextContract ){
 
-        let input
+        let input:any
         try {
             input = await request.validate(LoginValidator)
         } catch (error) {
@@ -130,7 +137,7 @@ export default class AuthController extends AppBaseController{
         if(user){
             let token
             try {
-                token = await auth.attempt(input.email, input.password)
+                token = await auth.use('api').attempt(input.email, input.password)
             } catch {
                 return this.sendError('Invalid credentials.')
             }
@@ -146,26 +153,78 @@ export default class AuthController extends AppBaseController{
         return input;
     }
 
-    public async send_reset_password_otp( { response,request }: HttpContextContract ) {
+    async socialLogin({request, auth, response}: HttpContextContract) {
+        let input:any
         try {
-            await request.validate(ResendSignupOtpValidator)
+            input = await request.validate(SocialLoginValidator)
         } catch (error) {
             return this.sendValidationError(error,response)
         }
 
-        const input = request.all();
+        let user = await UserRepo.findSocialLogin(request)
+        if (user == null) {
+            user = await UserRepo.model.findBy('email',request.input('email'));
+            if (user == null) {
+                user = await UserRepo.socialLogin(request)
+            } else {
+                return response.status(403).json({status: false, message: "Email already exists"})
+            }
+        }
 
-        await Otp.query().where('email', input.email).delete();
-        let user = await User.findBy('email', input.email);
-        if(user){
-            const code = UserHelper.generateOTP(user.id,user.email);
+        /* Assign User Role */
+        await user.related('userRoles').create({
+            roleId: input.account_type
+        })
 
-            /* Send Email */
-            const subject = 'Reset Password OTP'
-            await new ResetPassword(user, code, subject).sendLater()
-            return this.sendResponse({user: user},"An OTP has been sent to your email address")
-        }else{
+        if(input.device_type && input.device_token){
+            await user.devices().create({device_type:input.device_type, device_token:input.device_token});
+        }
+
+        if (!user.stripe_customer_id && await RoleHelper.has_role(user,Role.USER)) {
+            let customer = await StripeRepo.addCustomer(user.email)
+            user.stripe_customer_id = customer.id
+            await user.save()
+        }
+        const token = await auth.use('api').generate(user)
+        return this.sendResponse({user:user,token:token},'Logged in successfully !')
+    }
+
+    async forgotPassword({request,response}: HttpContextContract) {
+
+        let input:any
+        try {
+            input = await request.validate(ForgotPasswordValidator)
+        } catch (error) {
+            return this.sendValidationError(error,response)
+        }
+
+        let user = await UserRepo.model.findBy('email',input.email);
+        if (!user) {
             return this.sendError('User not found.')
+        }
+        await OtpRepo.model.query().where('email', user.email).delete();
+
+        /* Send Email */
+        const code:number = UserHelper.generateOTP(user.id,user.email)
+        const subject = 'Reset Password OTP'
+        await new ResetPassword(user, code, subject).sendLater()
+        return this.sendResponse({user: user},"An OTP has been sent to your email address")
+    }
+
+    async verifyOtp({request, response}) {
+        let input:any
+        try {
+            input = await request.validate(VerifyOtpValidator)
+        } catch (error) {
+            return this.sendValidationError(error,response)
+        }
+
+        let otpMinTime:any = Helper.getOtpMinTime();
+        let otp = await OtpRepo.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        if(otp){
+            return this.sendResponse(true, "OTP is valid.")
+        }else{
+            return this.sendResponse(false, "OTP not found is expired.")
         }
     }
 
@@ -179,7 +238,7 @@ export default class AuthController extends AppBaseController{
         }
 
         let otpMinTime = Helper.getOtpMinTime();
-        let otp = await Otp.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        let otp = await OtpRepo.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
         if(otp){
             let user = await User.find(otp.user_id)
             if(user){
@@ -194,11 +253,11 @@ export default class AuthController extends AppBaseController{
         }else{
             return this.sendError('OTP not found or is expired.')
         }
-
     }
 
-    public async test( { auth }: HttpContextContract ){
-        return auth
+    public async logout({auth}:HttpContextContract){
+        await auth.use('api').revoke()
+        return this.sendResponse({revoked:true},'Logged out successfully !')
     }
 
 }

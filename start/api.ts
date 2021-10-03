@@ -2,7 +2,9 @@ import Route from '@ioc:Adonis/Core/Route'
 
 Route.group(() => {
 
-    // Guest API Routes
+    /*
+    * Guest API Routes
+    * */
     Route.group(() => {
 
         // Login | Register | Verify email
@@ -10,27 +12,25 @@ Route.group(() => {
         Route.post('resend-signup-otp', 'API/AuthController.resend_signup_otp')
         Route.post('verify-email', 'API/AuthController.verify_email')
         Route.post('login', 'API/AuthController.login')
+        Route.post('social-login', 'Api/AuthController.socialLogin')
 
         // Reset Password
-        Route.post('send-reset-password-otp', 'API/AuthController.send_reset_password_otp')
+        Route.post('forgot-password', 'API/AuthController.forgotPassword')
+        Route.post('verify-otp', 'API/AuthController.verifyOtp')
         Route.post('reset-password', 'API/AuthController.reset_password')
-
     }).middleware('guest')
 
-    Route.post('/logout', async ({ auth }) => {
-        await auth.use('api').revoke()
-        return {
-            revoked: true
-        }
-    })
+    Route.post('logout', 'API/AuthController.logout')
 
-    // Auth API Routes
+    /*
+    * Authenticated API Routes
+    * */
     Route.group(() => {
-
-
-
-        Route.get('test', 'API/AuthController.test')
+        Route.put('change-password', 'API/UserController.changePassword')
+        Route.get('profile', 'API/UserController.profile')
+        Route.get('generate-connect-account-link', 'API/StripeController.createAccountLink')
+        Route.post('add-stripe-card', 'API/StripeController.addCard')
+        Route.resource('user-cards', 'Api/UserCardController')
     }).middleware('auth')
-
 
 }).prefix('/api')

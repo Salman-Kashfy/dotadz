@@ -17,6 +17,7 @@ import Env from '@ioc:Adonis/Core/Env'
 export default Env.rules({
 	HOST: Env.schema.string({ format: 'host' }),
 	PORT: Env.schema.number(),
+	APP_URL: Env.schema.string(),
 	APP_KEY: Env.schema.string(),
 	APP_NAME: Env.schema.string(),
 	CACHE_VIEWS: Env.schema.boolean(),
@@ -35,5 +36,8 @@ export default Env.rules({
 	REDIS_HOST: Env.schema.string({ format: 'host' }),
 	REDIS_PORT: Env.schema.number(),
 	REDIS_PASSWORD: Env.schema.string.optional(),
+
+	STRIPE_KEY: Env.schema.string(),
+	STRIPE_SECRET: Env.schema.string(),
 
 })

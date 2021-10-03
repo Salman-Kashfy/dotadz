@@ -1,10 +1,8 @@
 import { DateTime } from 'luxon'
 import Hash from '@ioc:Adonis/Core/Hash'
-import {
-    column,
-    beforeSave,
-    BaseModel,
-} from '@ioc:Adonis/Lucid/Orm'
+import {column, beforeSave, hasMany, HasMany, BaseModel} from '@ioc:Adonis/Lucid/Orm'
+
+import UserRole from "App/Models/UserRole";
 
 export default class User extends BaseModel {
     @column({ isPrimary: true })
@@ -25,20 +23,26 @@ export default class User extends BaseModel {
     @column()
     public phone: string
 
-    @column()
-    public wallet: string
+    @column({ serializeAs: null })
+    public stripe_customer_id: string
+
+    @column({ serializeAs: null })
+    public social_platform: string
+
+    @column({ serializeAs: null })
+    public client_id: string
 
     @column()
-    public rating: number
+    public is_social_login: boolean
 
     @column()
     public image: string
 
     @column()
-    public is_verified: boolean
+    public rememberMeToken: string
 
     @column()
-    public rememberMeToken: string
+    public is_verified: boolean
 
     @column.dateTime({ autoCreate: true })
     public createdAt: DateTime
@@ -52,4 +56,10 @@ export default class User extends BaseModel {
             user.password = await Hash.make(user.password)
         }
     }
+
+    @hasMany(() => UserRole)
+    public userRoles: HasMany<typeof UserRole>
+
+
+
 }
