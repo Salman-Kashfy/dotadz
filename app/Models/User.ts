@@ -5,6 +5,9 @@ import {column, beforeSave, hasMany, HasMany, BaseModel} from '@ioc:Adonis/Lucid
 import UserRole from "App/Models/UserRole";
 
 export default class User extends BaseModel {
+
+    public static fillables = ['name','email','password','phone']
+
     @column({ isPrimary: true })
     public id: number
 

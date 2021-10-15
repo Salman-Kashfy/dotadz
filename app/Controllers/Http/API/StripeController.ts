@@ -1,17 +1,17 @@
 // import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import AppBaseController from "App/Controllers/Http/AppBaseController";
-import StripeRepo from "App/Repositories/StripeRepository";
+import StripeRepository from "App/Repositories/StripeRepository";
 import {HttpContextContract} from "@ioc:Adonis/Core/HttpContext";
-import UserRepo from "App/Repositories/UserRepository";
-import UserCardRepo from "App/Repositories/UserCardRepository";
+import UserRepository from "App/Repositories/UserRepository";
+import UserCardRepository from "App/Repositories/UserCardRepository";
 import AddStripeCardValidator from "App/Validators/AddStripeCardValidator";
 
 export default class StripeController extends AppBaseController{
 
     async addCustomer({request}: HttpContextContract) {
         let userData:any = request.input('userData')
-        let customer = await StripeRepo.addCustomer(userData.email)
-        await UserRepo.model.query().where('id', userData.id).update({
+        let customer = await StripeRepository.addCustomer(userData.email)
+        await UserRepository.model.query().where('id', userData.id).update({
             stripe_customer_id: customer.id
         })
         return this.globalResponse(true, "Customer created successfully", customer)
@@ -25,8 +25,8 @@ export default class StripeController extends AppBaseController{
         }
 
         let { user }:any = auth
-        let payment_method = await StripeRepo.addCard(user.stripe_customer_id, request.input('payment_method'));
-        let user_card = await UserCardRepo.store({
+        let payment_method = await StripeRepository.addCard(user.stripe_customer_id, request.input('payment_method'));
+        let user_card = await UserCardRepository.store({
             user_id: user.id,
             payment_method_id: payment_method.id,
             last_four: payment_method.card.last4,
@@ -36,7 +36,7 @@ export default class StripeController extends AppBaseController{
             exp_year: payment_method.card.exp_year,
         })
         if (request.input('apple_pay', null)) {
-            let payment_intent = await StripeRepo.createPaymentIntent(user.stripe_customer_id, user_card.payment_method_id, 0.5);
+            let payment_intent = await StripeRepository.createPaymentIntent(user.stripe_customer_id, user_card.payment_method_id, 0.5);
             user_card.client_secret = payment_intent.client_secret
         } else {
             user_card.client_secret = null
@@ -47,7 +47,7 @@ export default class StripeController extends AppBaseController{
 
     async createAccountLink({auth}: HttpContextContract) {
         let { user }:any = auth
-        let data:any = await StripeRepo.createAccountLink(user.id)
+        let data:any = await StripeRepository.createAccountLink(user.id)
         return this.globalResponse(true, "Link generated successfully", data.account_link)
     }
     

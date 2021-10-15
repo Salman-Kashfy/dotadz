@@ -6,16 +6,16 @@ import User from "App/Models/User";
 import Helper from "App/Helpers/Helper";
 import UserHelper from "App/Helpers/UserHelper";
 import VerifyEmail from "App/Mailers/VerifyEmail";
-import OtpRepo from "App/Repositories/OtpRepository";
+import OtpRepository from "App/Repositories/OtpRepository";
 import ResendSignupOtpValidator from "App/Validators/ResendSignupOtpValidator";
 import VerifyEmailValidator from "App/Validators/VerifyEmailValidator";
 import LoginValidator from "App/Validators/LoginValidator";
 import ResetPassword from "App/Mailers/ResetPassword";
 import ResetPasswordValidator from "App/Validators/ResetPasswordValidator";
-import UserRepo from "App/Repositories/UserRepository";
+import UserRepository from "App/Repositories/UserRepository";
 import RoleHelper from "App/Helpers/RoleHelper";
 import Role from "App/Models/Role";
-import StripeRepo from "App/Repositories/StripeRepository";
+import StripeRepository from "App/Repositories/StripeRepository";
 import ForgotPasswordValidator from "App/Validators/ForgotPasswordValidator";
 import VerifyOtpValidator from "App/Validators/VerifyOtpValidator";
 import SocialLoginValidator from "App/Validators/SocialLoginValidator";
@@ -31,7 +31,9 @@ export default class AuthController extends AppBaseController{
             return this.sendValidationError(error,response)
         }
 
-        /* Delete user if unverified */
+        /*
+        * Delete user if unverified
+        *  */
         let user = await User.findBy('email', input.email)
         if(user){
             if (user.is_verified) {
@@ -41,29 +43,32 @@ export default class AuthController extends AppBaseController{
             }
         }
 
-        /* Create User */
-        user = new User();
-        user.name = input.name
-        user.email = input.email
-        user.password = input.password
-        user.phone = input.phone
-        user.is_verified = false;
-        if(!await user.save()){
+        /*
+        * Create user
+        *  */
+        user = await UserRepository.store(request.only(User.fillables))
+        if(!user){
             return this.sendError('Failed to register user.')
         }
 
         const code = UserHelper.generateOTP(user.id, user.email)
 
-        /* Assign User Role */
+        /*
+        * Assign user role
+        *  */
         await user.related('userRoles').create({
             roleId: input.account_type
         })
 
-        /* Create User Device */
+        /*
+        * Create user device
+        *  */
         if(input.device_type && input.device_token)
         await UserHelper.setUserDevice(user.id, input.device_type, input.device_token);
 
-        /* Send Email */
+        /*
+        * Send verification email
+        *  */
         const subject = 'Please verify your email address.'
         await new VerifyEmail(user, code, subject).sendLater()
         return this.sendResponse({user: user},"An OTP has been sent to your email address")
@@ -78,12 +83,21 @@ export default class AuthController extends AppBaseController{
 
         const input = request.all();
 
-        await OtpRepo.model.query().where('email', input.email).delete();
-        let user = await UserRepo.model.findBy('email', input.email);
+        /*
+        * Delete any old/expired tokens for current user
+        * */
+        await OtpRepository.model.query().where('email', input.email).delete();
+        let user = await UserRepository.model.findBy('email', input.email);
         if(user){
+
+            /*
+            * Generate fresh token
+            *  */
             const code:number = UserHelper.generateOTP(user.id,user.email);
 
-            /* Send Email */
+            /*
+            * Send verification email
+            *  */
             const subject:string = 'Please verify your email address.'
             await new VerifyEmail(user, code, subject).sendLater()
             return this.sendResponse({user: user},"An OTP has been sent to your email address")
@@ -100,19 +114,26 @@ export default class AuthController extends AppBaseController{
         }
 
         const input = request.all();
+
+        /*
+        * Verify if OTP is valid and not expired
+        * */
         let otpMinTime:any = Helper.getOtpMinTime();
-        let otp:any = await OtpRepo.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        let otp:any = await OtpRepository.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
         if(!otp){
             return this.sendError('OTP not found or is expired.')
         }
 
-        let user = await UserRepo.model.find(otp.user_id)
+        let user = await UserRepository.model.find(otp.user_id)
         if(!user){
             return this.sendError('User not found.')
         }
 
+        /*
+        * If OTP is valid. Add a customer in stripe for role: user.
+        * */
         if (await RoleHelper.has_role(user,Role.USER)) {
-            let customer = await StripeRepo.addCustomer(user.email)
+            let customer = await StripeRepository.addCustomer(user.email)
             user.stripe_customer_id = customer.id
             await user.save()
         }
@@ -120,6 +141,10 @@ export default class AuthController extends AppBaseController{
         if( !await user.save() ){
             return this.sendError('Failed to verify user. Please try again.')
         }
+
+        /*
+        * Delete OTP after successful verification .
+        * */
         otp.delete()
         return this.sendResponse({user:user},'OTP verified successfully !')
     }
@@ -161,17 +186,22 @@ export default class AuthController extends AppBaseController{
             return this.sendValidationError(error,response)
         }
 
-        let user = await UserRepo.findSocialLogin(request)
+        /*
+        * If user email is not found, we create a user record and mark it social login.
+        * */
+        let user = await UserRepository.findSocialLogin(request)
         if (user == null) {
-            user = await UserRepo.model.findBy('email',request.input('email'));
+            user = await UserRepository.model.findBy('email',request.input('email'));
             if (user == null) {
-                user = await UserRepo.socialLogin(request)
+                user = await UserRepository.socialLogin(request)
             } else {
                 return response.status(403).json({status: false, message: "Email already exists"})
             }
         }
 
-        /* Assign User Role */
+        /*
+        * Assign user role
+        *  */
         await user.related('userRoles').create({
             roleId: input.account_type
         })
@@ -180,8 +210,11 @@ export default class AuthController extends AppBaseController{
             await user.devices().create({device_type:input.device_type, device_token:input.device_token});
         }
 
+        /*
+        * Add a customer in stripe for role: user.
+        * */
         if (!user.stripe_customer_id && await RoleHelper.has_role(user,Role.USER)) {
-            let customer = await StripeRepo.addCustomer(user.email)
+            let customer = await StripeRepository.addCustomer(user.email)
             user.stripe_customer_id = customer.id
             await user.save()
         }
@@ -198,13 +231,15 @@ export default class AuthController extends AppBaseController{
             return this.sendValidationError(error,response)
         }
 
-        let user = await UserRepo.model.findBy('email',input.email);
+        let user = await UserRepository.model.findBy('email',input.email);
         if (!user) {
             return this.sendError('User not found.')
         }
-        await OtpRepo.model.query().where('email', user.email).delete();
+        await OtpRepository.model.query().where('email', user.email).delete();
 
-        /* Send Email */
+        /*
+        * Send verification email
+        *  */
         const code:number = UserHelper.generateOTP(user.id,user.email)
         const subject = 'Reset Password OTP'
         await new ResetPassword(user, code, subject).sendLater()
@@ -219,8 +254,11 @@ export default class AuthController extends AppBaseController{
             return this.sendValidationError(error,response)
         }
 
+        /*
+        * Verify if OTP is valid and not expired
+        * */
         let otpMinTime:any = Helper.getOtpMinTime();
-        let otp = await OtpRepo.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        let otp = await OtpRepository.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
         if(otp){
             return this.sendResponse(true, "OTP is valid.")
         }else{
@@ -237,8 +275,15 @@ export default class AuthController extends AppBaseController{
             return this.sendValidationError(error,response)
         }
 
+        /*
+        * Verify if OTP is valid and not expired
+        * */
         let otpMinTime = Helper.getOtpMinTime();
-        let otp = await OtpRepo.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+        let otp = await OtpRepository.model.query().where('email', input.email).where('code', input.code).where('created_at', '>=',otpMinTime).orderBy('created_at','desc').first();
+
+        /*
+        * Reset password and delete OTP
+        * */
         if(otp){
             let user = await User.find(otp.user_id)
             if(user){

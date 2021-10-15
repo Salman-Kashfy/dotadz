@@ -3,8 +3,8 @@ import AppBaseController from "App/Controllers/Http/AppBaseController";
 
 import {HttpContextContract} from "@ioc:Adonis/Core/HttpContext";
 import ChangePasswordValidator from "App/Validators/ChangePasswordValidator";
-import StripeRepo from "App/Repositories/StripeRepository";
-import UserRepo from "App/Repositories/UserRepository";
+import StripeRepository from "App/Repositories/StripeRepository";
+import UserRepository from "App/Repositories/UserRepository";
 import Hash from "@ioc:Adonis/Core/Hash";
 
 export default class UserController extends AppBaseController{
@@ -35,9 +35,9 @@ export default class UserController extends AppBaseController{
     public async connectAccountSuccess({request, view}: HttpContextContract) {
         let input = request.only(['user_id', 'account_id'])
         if (input.hasOwnProperty('user_id') && input.hasOwnProperty('account_id')) {
-            let account = await StripeRepo.getAccountInfo(input.account_id)
+            let account = await StripeRepository.getAccountInfo(input.account_id)
             if (account.details_submitted) {
-                await UserRepo.model.query().where('id', input.user_id).update({connect_account_id: input.account_id})
+                await UserRepository.model.query().where('id', input.user_id).update({connect_account_id: input.account_id})
             }
         }
         return view.render('payment-success')
@@ -46,7 +46,7 @@ export default class UserController extends AppBaseController{
     public async connectAccountFailure({request, view}: HttpContextContract) {
         let input = request.only(['user_id'])
         if (input.hasOwnProperty('user_id')) {
-            await UserRepo.model.query().where('id', input.user_id).update({connect_account_id: null})
+            await UserRepository.model.query().where('id', input.user_id).update({connect_account_id: null})
         }
         return view.render('payment-failure')
     }
