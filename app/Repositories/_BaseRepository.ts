@@ -32,6 +32,10 @@ export default class _BaseRepository {
         return await row.merge(input).save()
     }
 
+    async destroy(id: number) {
+        return this.model.query().where('id', id).delete()
+    }
+
     protected fillables() {
         return Object.values(this.model.$keys.attributesToColumns.keys)
     }

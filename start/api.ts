@@ -3,8 +3,10 @@ import Route from '@ioc:Adonis/Core/Route'
 Route.group(() => {
 
     /*
-    * Guest API Routes
-    * */
+    |--------------------------------------------------------------------------
+    | Guest API Routes
+    |--------------------------------------------------------------------------
+    */
     Route.group(() => {
 
         // Login | Register | Verify email
@@ -23,14 +25,38 @@ Route.group(() => {
     Route.post('logout', 'API/AuthController.logout')
 
     /*
-    * Authenticated API Routes
-    * */
+    |--------------------------------------------------------------------------
+    | Authenticated API Routes
+    |--------------------------------------------------------------------------
+    */
     Route.group(() => {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Profile Routes
+        |--------------------------------------------------------------------------
+        */
         Route.put('change-password', 'API/UserController.changePassword')
         Route.get('profile', 'API/UserController.profile')
+
+        /*
+        |--------------------------------------------------------------------------
+        | Stripe API Routes
+        |--------------------------------------------------------------------------
+        */
         Route.get('generate-connect-account-link', 'API/StripeController.createAccountLink')
         Route.post('add-stripe-card', 'API/StripeController.addCard')
-        Route.resource('user-cards', 'Api/UserCardController')
+        Route.resource('user-cards', 'API/UserCardController')
+
+        /*
+        |--------------------------------------------------------------------------
+        | Category Resource Route
+        |--------------------------------------------------------------------------
+        */
+        Route.resource('categories', 'API/CategoriesController').middleware({
+            '*': ['admin']
+        })
+
     }).middleware('auth')
 
 }).prefix('/api')

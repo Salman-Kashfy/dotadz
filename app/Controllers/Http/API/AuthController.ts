@@ -1,5 +1,4 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
-//import { schema, rules } from '@ioc:Adonis/Core/Validator'
 import AppBaseController from "App/Controllers/Http/AppBaseController";
 import RegisterValidator from "App/Validators/RegisterValidator";
 import User from "App/Models/User";

@@ -7,7 +7,8 @@ export default class Categories extends BaseSchema {
         this.schema.createTable(this.tableName, (table) => {
             table.increments('id')
             table.integer('parent_id').unsigned().references('id').inTable('categories').nullable().onDelete('cascade')
-            table.string('name')
+            table.string('name',50)
+            table.string('icon',50).nullable()
             table.timestamps()
         })
     }
